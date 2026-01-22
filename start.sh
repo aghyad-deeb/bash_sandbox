@@ -268,7 +268,8 @@ spec.loader.exec_module(swerex_server)
 
 import uvicorn
 port = int(os.environ.get('SERVER_PORT', 8180))
-uvicorn.run(swerex_server.app, host='127.0.0.1', port=port, log_level='info')
+backlog = int(os.environ.get('SWEREX_BACKLOG', '2048'))
+uvicorn.run(swerex_server.app, host='127.0.0.1', port=port, log_level='info', backlog=backlog)
 SCRIPT
 
 # Start server

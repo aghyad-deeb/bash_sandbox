@@ -2,8 +2,8 @@
 # Stop SweRex containers and session server
 #
 # Usage:
-#   ./stop_all.sh              # Stop everything
-#   ./stop_all.sh --keep-containers   # Only stop server, keep containers
+#   ./stop.sh              # Stop everything
+#   ./stop.sh --keep-containers   # Only stop server, keep containers
 
 set -e
 

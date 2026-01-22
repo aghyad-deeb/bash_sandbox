@@ -81,8 +81,8 @@ if [ "$USE_TMUX" = true ] && [ -z "$TMUX" ] && [ -z "$SWEREX_IN_TMUX" ]; then
             
             # Parse health info
             RESP=$(curl -s "http://localhost:$SERVER_PORT/health")
-            SESSIONS=$(echo "$RESP" | python -c "import sys,json; print(json.load(sys.stdin).get('total_sessions', 0))" 2>/dev/null || echo "?")
-            HEALTHY=$(echo "$RESP" | python -c "import sys,json; print(json.load(sys.stdin).get('healthy_containers', 0))" 2>/dev/null || echo "?")
+            SESSIONS=$(echo "$RESP" | python3.12 -c "import sys,json; print(json.load(sys.stdin).get('total_sessions', 0))" 2>/dev/null || echo "?")
+            HEALTHY=$(echo "$RESP" | python3.12 -c "import sys,json; print(json.load(sys.stdin).get('healthy_containers', 0))" 2>/dev/null || echo "?")
             
             echo "  Server URL:    http://localhost:$SERVER_PORT"
             echo "  Sessions:      $SESSIONS total"
@@ -249,7 +249,7 @@ export SWEREX_ACQUIRE_TIMEOUT="${SWEREX_ACQUIRE_TIMEOUT:-120}"
 export SWEREX_SESSIONS_PER_CONTAINER="$SESSIONS_PER_CONTAINER"
 
 # Generate endpoints
-ENDPOINTS=$(python -c "print(','.join([f'http://localhost:{18000+i}' for i in range($NUM_CONTAINERS)]))")
+ENDPOINTS=$(python3.12 -c "print(','.join([f'http://localhost:{18000+i}' for i in range($NUM_CONTAINERS)]))")
 export SWEREX_ENDPOINTS="$ENDPOINTS"
 
 # Create startup script
@@ -301,10 +301,10 @@ EOF
     echo ""
     
     # Run in foreground - uvicorn will handle signals
-    exec python "$STARTUP_SCRIPT" 2>&1 | tee "$LOG_FILE"
+    exec python3.12 "$STARTUP_SCRIPT" 2>&1 | tee "$LOG_FILE"
 else
     # Background mode
-    python "$STARTUP_SCRIPT" > "$LOG_FILE" 2>&1 &
+    python3.12 "$STARTUP_SCRIPT" > "$LOG_FILE" 2>&1 &
     SERVER_PID=$!
     
     # Save PID immediately
@@ -350,9 +350,9 @@ EOF
         
         RESP=$(curl -s "http://localhost:$SERVER_PORT/health" 2>&1)
         if echo "$RESP" | grep -q "total_sessions"; then
-            SESSIONS=$(echo "$RESP" | python -c "import sys,json; print(json.load(sys.stdin).get('total_sessions', 0))" 2>/dev/null || echo "?")
-            HEALTHY=$(echo "$RESP" | python -c "import sys,json; print(json.load(sys.stdin).get('healthy_containers', 0))" 2>/dev/null || echo "?")
-            STATUS=$(echo "$RESP" | python -c "import sys,json; print(json.load(sys.stdin).get('status', 'unknown'))" 2>/dev/null || echo "unknown")
+            SESSIONS=$(echo "$RESP" | python3.12 -c "import sys,json; print(json.load(sys.stdin).get('total_sessions', 0))" 2>/dev/null || echo "?")
+            HEALTHY=$(echo "$RESP" | python3.12 -c "import sys,json; print(json.load(sys.stdin).get('healthy_containers', 0))" 2>/dev/null || echo "?")
+            STATUS=$(echo "$RESP" | python3.12 -c "import sys,json; print(json.load(sys.stdin).get('status', 'unknown'))" 2>/dev/null || echo "unknown")
             
             echo ""
             echo "============================================================"

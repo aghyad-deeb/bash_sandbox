@@ -73,6 +73,9 @@ SWEREX_SERVER_HOST = os.getenv("SWEREX_SERVER_HOST", "127.0.0.1")
 SWEREX_SERVER_PORT = int(os.getenv("SWEREX_SERVER_PORT", "8080"))
 SWEREX_COMMAND_TIMEOUT = float(os.getenv("SWEREX_COMMAND_TIMEOUT", "30"))
 SWEREX_HEALTH_CHECK_INTERVAL = float(os.getenv("SWEREX_HEALTH_CHECK_INTERVAL", "30"))
+# Server-side rate limiting: max concurrent acquire requests being processed
+# This is the key insight from SandboxFusion - don't try to handle 1000s of concurrent requests
+SWEREX_MAX_CONCURRENT_ACQUIRE = int(os.getenv("SWEREX_MAX_CONCURRENT_ACQUIRE", "32"))
 
 # =============================================================================
 # Data Models
@@ -866,12 +869,19 @@ class SessionManager:
 # =============================================================================
 
 manager: Optional[SessionManager] = None
+# Server-side rate limiter: controls how many /acquire requests are processed concurrently
+# This prevents overwhelming the server when 1000s of clients connect simultaneously
+_acquire_semaphore: Optional[asyncio.Semaphore] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
-    global manager
+    global manager, _acquire_semaphore
+    
+    # Initialize server-side rate limiter
+    _acquire_semaphore = asyncio.Semaphore(SWEREX_MAX_CONCURRENT_ACQUIRE)
+    logger.info(f"Initialized acquire rate limiter: max {SWEREX_MAX_CONCURRENT_ACQUIRE} concurrent requests")
     
     # Parse endpoints
     endpoints = [e.strip() for e in SWEREX_ENDPOINTS.split(",") if e.strip()]
@@ -906,10 +916,31 @@ app = FastAPI(
 
 @app.post("/session/acquire", response_model=AcquireResponse)
 async def acquire_session(request: AcquireRequest) -> AcquireResponse:
-    """Acquire a session from the pool."""
+    """Acquire a session from the pool.
+    
+    Server-side rate limiting ensures we only process SWEREX_MAX_CONCURRENT_ACQUIRE
+    requests at a time. Additional requests queue on the semaphore, not at TCP level.
+    """
     assert manager is not None
-    session_id = await manager.acquire(request.files, request.startup_commands)
-    return AcquireResponse(session_id=session_id)
+    assert _acquire_semaphore is not None
+    
+    # #region agent log
+    import json as _json; _endpoint_start = time.time(); _log_path = "/tmp/swerex_debug.log"; open(_log_path, "a").write(_json.dumps({"hypothesisId": "E_ratelimit", "location": "swerex_server.py:acquire_endpoint:start", "message": "endpoint_received_request", "data": {"num_files": len(request.files) if request.files else 0}, "timestamp": int(time.time()*1000)}) + "\n")
+    # #endregion
+    
+    # Rate limit: only process N acquire requests concurrently
+    async with _acquire_semaphore:
+        # #region agent log
+        _after_semaphore = time.time(); open(_log_path, "a").write(_json.dumps({"hypothesisId": "E_ratelimit", "location": "swerex_server.py:acquire_endpoint:semaphore_acquired", "message": "semaphore_acquired", "data": {"semaphore_wait_ms": int((_after_semaphore - _endpoint_start)*1000)}, "timestamp": int(time.time()*1000)}) + "\n")
+        # #endregion
+        
+        session_id = await manager.acquire(request.files, request.startup_commands)
+        
+        # #region agent log
+        open(_log_path, "a").write(_json.dumps({"hypothesisId": "E_ratelimit", "location": "swerex_server.py:acquire_endpoint:complete", "message": "endpoint_complete", "data": {"session_id": session_id, "total_endpoint_ms": int((time.time() - _endpoint_start)*1000)}, "timestamp": int(time.time()*1000)}) + "\n")
+        # #endregion
+        
+        return AcquireResponse(session_id=session_id)
 
 
 @app.post("/session/{session_id}/execute", response_model=ExecuteResponse)

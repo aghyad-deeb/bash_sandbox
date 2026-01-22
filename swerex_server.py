@@ -216,11 +216,28 @@ class SessionManager:
         logger.info(f"Initializing SessionManager with {len(self.endpoints)} endpoints, "
                    f"{self.sessions_per_container} sessions each")
         
-        # Initialize containers in parallel
+        # Limit concurrent container initialization to avoid overwhelming the system
+        # Each container initialization makes multiple HTTP requests
+        max_concurrent_init = int(os.getenv("SWEREX_MAX_CONCURRENT_INIT", "16"))
+        semaphore = asyncio.Semaphore(max_concurrent_init)
+        total_containers = len(self.endpoints)
+        initialized_count = [0]  # Use list to allow mutation in nested function
+        
+        async def init_with_semaphore(container_id: str, endpoint: str):
+            async with semaphore:
+                result = await self._init_container(container_id, endpoint)
+                initialized_count[0] += 1
+                if initialized_count[0] % 10 == 0 or initialized_count[0] == total_containers:
+                    logger.info(f"Container initialization progress: {initialized_count[0]}/{total_containers}")
+                return result
+        
+        logger.info(f"Starting container initialization (max {max_concurrent_init} concurrent)")
+        
+        # Initialize containers with controlled concurrency
         init_tasks = []
         for i, endpoint in enumerate(self.endpoints):
             container_id = f"c{i}"
-            init_tasks.append(self._init_container(container_id, endpoint))
+            init_tasks.append(init_with_semaphore(container_id, endpoint))
         
         results = await asyncio.gather(*init_tasks, return_exceptions=True)
         
@@ -249,6 +266,7 @@ class SessionManager:
     
     async def _init_container(self, container_id: str, endpoint: str) -> None:
         """Initialize a single container and create its sessions."""
+        logger.debug(f"Initializing container {container_id} at {endpoint}")
         # Parse endpoint
         if "://" in endpoint:
             url_part = endpoint.split("://")[1]
@@ -546,6 +564,8 @@ class SessionManager:
             output_match = re.search(r"Here is the output:\n'(.*)'", error_str, re.DOTALL)
             if output_match:
                 output = output_match.group(1)
+                # Convert escaped newlines to actual newlines
+                output = output.replace("\\n", "\n")
             
             return CommandResult(
                 status="Failed",

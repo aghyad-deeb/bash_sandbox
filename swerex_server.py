@@ -397,13 +397,22 @@ class SessionManager:
         Raises:
             HTTPException: If no session available within timeout
         """
+        # #region agent log
+        import json as _json; _acq_start = time.time(); _log_path = "/tmp/swerex_debug.log"; open(_log_path, "a").write(_json.dumps({"hypothesisId": "A_server", "location": "swerex_server.py:acquire:start", "message": "acquire_start", "data": {"num_files": len(files) if files else 0, "available_sessions": sum(1 for s in self.sessions.values() if s.state == SessionState.AVAILABLE), "in_use_sessions": sum(1 for s in self.sessions.values() if s.state == SessionState.IN_USE)}, "timestamp": int(time.time()*1000)}) + "\n")
+        # #endregion
         if timeout is None:
             timeout = self._acquire_timeout
         
         session = None
         deadline = time.time() + timeout
         
+        # #region agent log
+        _lock_start = time.time(); open(_log_path, "a").write(_json.dumps({"hypothesisId": "A_server", "location": "swerex_server.py:acquire:lock_wait", "message": "waiting_for_lock", "data": {"time_before_lock_ms": int((_lock_start - _acq_start)*1000)}, "timestamp": int(time.time()*1000)}) + "\n")
+        # #endregion
         async with self._session_available:
+            # #region agent log
+            _lock_acquired = time.time(); open(_log_path, "a").write(_json.dumps({"hypothesisId": "A_server", "location": "swerex_server.py:acquire:lock_acquired", "message": "lock_acquired", "data": {"lock_wait_ms": int((_lock_acquired - _lock_start)*1000)}, "timestamp": int(time.time()*1000)}) + "\n")
+            # #endregion
             while session is None:
                 # Try to find an available session
                 # Sort containers: healthy first, then by available count (descending)
@@ -429,6 +438,9 @@ class SessionManager:
                 # No session available - wait for one
                 remaining = deadline - time.time()
                 if remaining <= 0:
+                    # #region agent log
+                    open(_log_path, "a").write(_json.dumps({"hypothesisId": "C_server", "location": "swerex_server.py:acquire:timeout", "message": "acquire_timeout_no_session", "data": {"timeout": timeout, "total_wait_ms": int((time.time() - _acq_start)*1000)}, "timestamp": int(time.time()*1000)}) + "\n")
+                    # #endregion
                     raise HTTPException(
                         status_code=503,
                         detail=f"No session available within {timeout}s timeout. "
@@ -445,6 +457,9 @@ class SessionManager:
                     # Timeout on wait, loop will check deadline
                     pass
         
+        # #region agent log
+        _setup_start = time.time(); open(_log_path, "a").write(_json.dumps({"hypothesisId": "D_server", "location": "swerex_server.py:acquire:setup_start", "message": "starting_setup", "data": {"session_id": session.id, "has_files": bool(files), "has_commands": bool(startup_commands)}, "timestamp": int(time.time()*1000)}) + "\n")
+        # #endregion
         # Setup files/commands outside lock (can take time)
         try:
             if files or startup_commands:
@@ -454,8 +469,14 @@ class SessionManager:
             async with self._lock:
                 session.state = SessionState.BROKEN
             await self._cleanup_queue.put(session.id)
+            # #region agent log
+            open(_log_path, "a").write(_json.dumps({"hypothesisId": "D_server", "location": "swerex_server.py:acquire:setup_failed", "message": "setup_failed", "data": {"error": str(e)[:200], "setup_duration_ms": int((time.time() - _setup_start)*1000)}, "timestamp": int(time.time()*1000)}) + "\n")
+            # #endregion
             raise HTTPException(status_code=500, detail=f"Session setup failed: {e}")
         
+        # #region agent log
+        open(_log_path, "a").write(_json.dumps({"hypothesisId": "A_server", "location": "swerex_server.py:acquire:success", "message": "acquire_complete", "data": {"session_id": session.id, "total_duration_ms": int((time.time() - _acq_start)*1000), "setup_duration_ms": int((time.time() - _setup_start)*1000)}, "timestamp": int(time.time()*1000)}) + "\n")
+        # #endregion
         logger.debug(f"Acquired session {session.id}")
         return session.id
     

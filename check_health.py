@@ -442,6 +442,11 @@ def main():
         action="store_true",
         help="Only check container health, skip server check"
     )
+    parser.add_argument(
+        "--brief",
+        action="store_true",
+        help="Show compact one-line status (good for monitoring)"
+    )
     
     args = parser.parse_args()
     
@@ -472,6 +477,31 @@ def main():
     # Output results
     if args.json:
         output_json(health)
+    elif args.brief:
+        # Compact one-line output for monitoring
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        
+        server = health.server
+        if server.reachable:
+            status_icon = Colors.GREEN + "●" + Colors.RESET
+            sessions_info = f"{server.available_sessions}/{server.total_sessions} avail"
+            in_use = server.in_use_sessions or 0
+            if in_use > 0:
+                sessions_info += f", {in_use} in use"
+        else:
+            status_icon = Colors.RED + "●" + Colors.RESET
+            sessions_info = "UNREACHABLE"
+        
+        healthy_containers = sum(1 for c in health.containers if c.healthy)
+        total_containers = len(health.containers)
+        
+        if total_containers > 0:
+            container_info = f"{healthy_containers}/{total_containers} containers"
+        else:
+            container_info = "no container checks"
+        
+        print(f"[{timestamp}] {status_icon} Sessions: {sessions_info} | {container_info}")
     else:
         print(f"\n{Colors.BOLD}{'='*60}{Colors.RESET}")
         print(f"{Colors.BOLD}           SWEREX HEALTH CHECK{Colors.RESET}")

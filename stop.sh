@@ -2,8 +2,9 @@
 # Stop SweRex containers and session server
 #
 # Usage:
-#   ./stop.sh                    # Stop everything
+#   ./stop.sh                    # Stop everything (server, containers, tmux)
 #   ./stop.sh --keep-containers  # Only stop server, keep containers
+#   ./stop.sh --keep-tmux        # Keep tmux session running
 #   ./stop.sh --force            # Force kill everything immediately
 
 # Don't use set -e - we want graceful handling of failures
@@ -17,10 +18,12 @@ PID_FILE="/tmp/swerex_server.pid"
 STATE_FILE="/tmp/swerex_state"
 LOG_FILE="/tmp/swerex_server.log"
 STARTUP_SCRIPT="/tmp/start_swerex_server.py"
+TMUX_SESSION="sandbox"
 
 # Parse arguments
 KEEP_CONTAINERS=false
 FORCE_KILL=false
+KEEP_TMUX=false
 for arg in "$@"; do
     case $arg in
         --keep-containers)
@@ -28,6 +31,9 @@ for arg in "$@"; do
             ;;
         --force)
             FORCE_KILL=true
+            ;;
+        --keep-tmux)
+            KEEP_TMUX=true
             ;;
     esac
 done
@@ -154,6 +160,18 @@ else
 fi
 
 # =============================================================================
+# STOP TMUX SESSION
+# =============================================================================
+
+if [ "$KEEP_TMUX" = false ]; then
+    if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+        echo ""
+        echo "Stopping tmux session '$TMUX_SESSION'..."
+        tmux kill-session -t "$TMUX_SESSION" 2>/dev/null && echo "  Tmux session stopped" || true
+    fi
+fi
+
+# =============================================================================
 # SHOW STATUS
 # =============================================================================
 
@@ -174,6 +192,13 @@ if pgrep -f "swerex_server" > /dev/null 2>&1; then
     echo "Server: RUNNING (WARNING: server still running!)"
 else
     echo "Server: STOPPED"
+fi
+
+# Tmux session status
+if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+    echo "Tmux session '$TMUX_SESSION': RUNNING"
+else
+    echo "Tmux session '$TMUX_SESSION': STOPPED"
 fi
 
 # Log file info

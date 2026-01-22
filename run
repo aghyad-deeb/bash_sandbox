@@ -1,0 +1,396 @@
+#!/usr/bin/env python3
+"""
+Bash Sandbox Interactive CLI
+
+An aesthetic terminal interface to interact with the Bash Sandbox server.
+"""
+
+import asyncio
+import json
+import os
+import sys
+import readline  # Enable arrow keys and history
+from datetime import datetime
+
+try:
+    import aiohttp
+except ImportError:
+    print("Error: aiohttp not installed. Run: pip install aiohttp")
+    sys.exit(1)
+
+# =============================================================================
+# Colors and Styling
+# =============================================================================
+
+class Colors:
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    
+    BLACK = "\033[30m"
+    RED = "\033[31m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    BLUE = "\033[34m"
+    MAGENTA = "\033[35m"
+    CYAN = "\033[36m"
+    WHITE = "\033[37m"
+    
+    BG_BLACK = "\033[40m"
+    BG_RED = "\033[41m"
+    BG_GREEN = "\033[42m"
+    BG_BLUE = "\033[44m"
+    BG_MAGENTA = "\033[45m"
+    BG_CYAN = "\033[46m"
+
+C = Colors
+
+def style(text, *styles):
+    return "".join(styles) + text + C.RESET
+
+def print_banner():
+    banner = f"""
+{C.CYAN}{C.BOLD}╔══════════════════════════════════════════════════════════════╗
+║                                                                  ║
+║   {C.WHITE}██████╗  █████╗ ███████╗██╗  ██╗                           {C.CYAN}║
+║   {C.WHITE}██╔══██╗██╔══██╗██╔════╝██║  ██║                           {C.CYAN}║
+║   {C.WHITE}██████╔╝███████║███████╗███████║                           {C.CYAN}║
+║   {C.WHITE}██╔══██╗██╔══██║╚════██║██╔══██║                           {C.CYAN}║
+║   {C.WHITE}██████╔╝██║  ██║███████║██║  ██║                           {C.CYAN}║
+║   {C.WHITE}╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝                           {C.CYAN}║
+║                                                                  ║
+║   {C.WHITE}███████╗ █████╗ ███╗   ██╗██████╗ ██████╗  ██████╗ ██╗  ██╗{C.CYAN}║
+║   {C.WHITE}██╔════╝██╔══██╗████╗  ██║██╔══██╗██╔══██╗██╔═══██╗╚██╗██╔╝{C.CYAN}║
+║   {C.WHITE}███████╗███████║██╔██╗ ██║██║  ██║██████╔╝██║   ██║ ╚███╔╝ {C.CYAN}║
+║   {C.WHITE}╚════██║██╔══██║██║╚██╗██║██║  ██║██╔══██╗██║   ██║ ██╔██╗ {C.CYAN}║
+║   {C.WHITE}███████║██║  ██║██║ ╚████║██████╔╝██████╔╝╚██████╔╝██╔╝ ██╗{C.CYAN}║
+║   {C.WHITE}╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝{C.CYAN}║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝{C.RESET}
+"""
+    print(banner)
+
+def print_help():
+    help_text = f"""
+{C.BOLD}{C.WHITE}Commands:{C.RESET}
+
+  {C.GREEN}Session Management:{C.RESET}
+    {C.CYAN}new{C.RESET}, {C.CYAN}acquire{C.RESET}      Acquire a new session
+    {C.CYAN}release{C.RESET}, {C.CYAN}done{C.RESET}     Release current session
+    {C.CYAN}sessions{C.RESET}          List all your sessions
+
+  {C.GREEN}Execution:{C.RESET}
+    {C.CYAN}<command>{C.RESET}          Execute bash command in current session
+    {C.CYAN}!<command>{C.RESET}         Execute locally (not in sandbox)
+
+  {C.GREEN}Server:{C.RESET}
+    {C.CYAN}status{C.RESET}, {C.CYAN}health{C.RESET}    Show server health
+    {C.CYAN}url [new_url]{C.RESET}     Show or change server URL
+
+  {C.GREEN}Other:{C.RESET}
+    {C.CYAN}help{C.RESET}, {C.CYAN}?{C.RESET}           Show this help
+    {C.CYAN}clear{C.RESET}, {C.CYAN}cls{C.RESET}        Clear screen
+    {C.CYAN}exit{C.RESET}, {C.CYAN}quit{C.RESET}, {C.CYAN}q{C.RESET}    Exit (releases session)
+
+{C.DIM}Tip: Commands are executed in a stateful bash session.
+     cd, export, and variables persist between commands.{C.RESET}
+"""
+    print(help_text)
+
+def format_timestamp():
+    return datetime.now().strftime("%H:%M:%S")
+
+# =============================================================================
+# Sandbox Client
+# =============================================================================
+
+class SandboxCLI:
+    def __init__(self, server_url: str = "http://localhost:8180"):
+        self.server_url = server_url
+        self.session_id = None
+        self.sessions = []  # Track multiple sessions
+        self.http = None
+        self.cwd = "~"  # Track working directory for prompt
+        
+    async def connect(self):
+        """Initialize HTTP client."""
+        self.http = aiohttp.ClientSession()
+        
+    async def close(self):
+        """Clean up."""
+        # Release all sessions
+        for sid in self.sessions:
+            try:
+                await self.http.post(f"{self.server_url}/session/{sid}/release")
+            except:
+                pass
+        if self.http:
+            await self.http.close()
+    
+    async def get_health(self) -> dict:
+        """Get server health."""
+        try:
+            async with self.http.get(f"{self.server_url}/health", timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+                return {"error": f"HTTP {resp.status}"}
+        except Exception as e:
+            return {"error": str(e)}
+    
+    async def acquire_session(self) -> str:
+        """Acquire a new session."""
+        try:
+            async with self.http.post(
+                f"{self.server_url}/session/acquire",
+                json={},
+                timeout=aiohttp.ClientTimeout(total=130)
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    sid = data["session_id"]
+                    self.sessions.append(sid)
+                    self.session_id = sid
+                    self.cwd = "/tmp/s/" + sid[:8]
+                    return sid
+                else:
+                    error = await resp.text()
+                    return None
+        except Exception as e:
+            print(f"{C.RED}Error: {e}{C.RESET}")
+            return None
+    
+    async def release_session(self, session_id: str = None):
+        """Release a session."""
+        sid = session_id or self.session_id
+        if not sid:
+            return False
+        
+        try:
+            await self.http.post(f"{self.server_url}/session/{sid}/release")
+            if sid in self.sessions:
+                self.sessions.remove(sid)
+            if sid == self.session_id:
+                self.session_id = self.sessions[-1] if self.sessions else None
+                self.cwd = "~"
+            return True
+        except Exception as e:
+            print(f"{C.RED}Error: {e}{C.RESET}")
+            return False
+    
+    async def execute(self, command: str, timeout: float = 30) -> dict:
+        """Execute a command."""
+        if not self.session_id:
+            return {"error": "No active session. Use 'new' to acquire one."}
+        
+        try:
+            async with self.http.post(
+                f"{self.server_url}/session/{self.session_id}/execute",
+                json={"command": command, "timeout": timeout},
+                timeout=aiohttp.ClientTimeout(total=timeout + 10)
+            ) as resp:
+                if resp.status == 200:
+                    result = await resp.json()
+                    # Update cwd if it was a cd command
+                    if command.strip().startswith("cd "):
+                        pwd_result = await self.execute("pwd", timeout=5)
+                        if pwd_result.get("status") == "Success":
+                            self.cwd = pwd_result.get("stdout", "").strip()
+                    return result
+                else:
+                    error = await resp.text()
+                    return {"error": f"HTTP {resp.status}: {error}"}
+        except asyncio.TimeoutError:
+            return {"error": f"Command timed out after {timeout}s"}
+        except Exception as e:
+            return {"error": str(e)}
+    
+    def get_prompt(self) -> str:
+        """Generate the prompt string."""
+        if self.session_id:
+            sid_short = self.session_id[:8]
+            # Shorten cwd
+            cwd = self.cwd
+            if len(cwd) > 30:
+                cwd = "..." + cwd[-27:]
+            return f"{C.GREEN}{C.BOLD}sandbox{C.RESET}:{C.BLUE}{sid_short}{C.RESET} {C.CYAN}{cwd}{C.RESET} $ "
+        else:
+            return f"{C.YELLOW}{C.BOLD}sandbox{C.RESET} {C.DIM}(no session){C.RESET} > "
+    
+    async def print_status(self):
+        """Print server status."""
+        health = await self.get_health()
+        
+        if "error" in health:
+            print(f"\n{C.RED}✗ Server unreachable: {health['error']}{C.RESET}\n")
+            return
+        
+        status_color = {
+            "healthy": C.GREEN,
+            "degraded": C.YELLOW,
+            "unhealthy": C.RED
+        }.get(health.get("status", ""), C.WHITE)
+        
+        print(f"""
+{C.BOLD}╭─────────────────────────────────────────╮{C.RESET}
+{C.BOLD}│{C.RESET}           {C.WHITE}Server Status{C.RESET}                {C.BOLD}│{C.RESET}
+{C.BOLD}├─────────────────────────────────────────┤{C.RESET}
+{C.BOLD}│{C.RESET}  Status:     {status_color}{health.get('status', 'unknown'):>25}{C.RESET}  {C.BOLD}│{C.RESET}
+{C.BOLD}│{C.RESET}  URL:        {self.server_url:>25}  {C.BOLD}│{C.RESET}
+{C.BOLD}├─────────────────────────────────────────┤{C.RESET}
+{C.BOLD}│{C.RESET}  {C.CYAN}Sessions{C.RESET}                                {C.BOLD}│{C.RESET}
+{C.BOLD}│{C.RESET}    Total:      {health.get('total_sessions', 0):>23}  {C.BOLD}│{C.RESET}
+{C.BOLD}│{C.RESET}    Available:  {C.GREEN}{health.get('available_sessions', 0):>23}{C.RESET}  {C.BOLD}│{C.RESET}
+{C.BOLD}│{C.RESET}    In Use:     {C.YELLOW}{health.get('in_use_sessions', 0):>23}{C.RESET}  {C.BOLD}│{C.RESET}
+{C.BOLD}│{C.RESET}    Cleaning:   {C.BLUE}{health.get('cleaning_sessions', 0):>23}{C.RESET}  {C.BOLD}│{C.RESET}
+{C.BOLD}│{C.RESET}    Broken:     {C.RED}{health.get('broken_sessions', 0):>23}{C.RESET}  {C.BOLD}│{C.RESET}
+{C.BOLD}├─────────────────────────────────────────┤{C.RESET}
+{C.BOLD}│{C.RESET}  {C.CYAN}Containers{C.RESET}                              {C.BOLD}│{C.RESET}
+{C.BOLD}│{C.RESET}    Healthy:    {C.GREEN}{health.get('healthy_containers', 0):>23}{C.RESET}  {C.BOLD}│{C.RESET}
+{C.BOLD}│{C.RESET}    Unhealthy:  {C.RED}{health.get('unhealthy_containers', 0):>23}{C.RESET}  {C.BOLD}│{C.RESET}
+{C.BOLD}╰─────────────────────────────────────────╯{C.RESET}
+""")
+        
+        if self.sessions:
+            print(f"{C.BOLD}Your sessions:{C.RESET}")
+            for sid in self.sessions:
+                marker = f"{C.GREEN}→{C.RESET}" if sid == self.session_id else " "
+                print(f"  {marker} {C.CYAN}{sid}{C.RESET}")
+            print()
+
+    async def run(self):
+        """Main CLI loop."""
+        print_banner()
+        
+        await self.connect()
+        
+        # Check server
+        health = await self.get_health()
+        if "error" in health:
+            print(f"{C.RED}✗ Cannot connect to server at {self.server_url}{C.RESET}")
+            print(f"{C.DIM}  Error: {health['error']}{C.RESET}")
+            print(f"\n{C.YELLOW}Make sure the server is running: ./start.sh{C.RESET}\n")
+        else:
+            print(f"{C.GREEN}✓ Connected to {self.server_url}{C.RESET}")
+            print(f"{C.DIM}  {health['available_sessions']} sessions available{C.RESET}")
+        
+        print(f"\n{C.DIM}Type 'help' for commands, 'new' to start a session{C.RESET}\n")
+        
+        try:
+            while True:
+                try:
+                    prompt = self.get_prompt()
+                    line = input(prompt).strip()
+                    
+                    if not line:
+                        continue
+                    
+                    # Parse command
+                    cmd = line.lower().split()[0] if line else ""
+                    args = line.split()[1:] if len(line.split()) > 1 else []
+                    
+                    # Handle commands
+                    if cmd in ("exit", "quit", "q"):
+                        print(f"\n{C.DIM}Goodbye!{C.RESET}\n")
+                        break
+                    
+                    elif cmd in ("help", "?"):
+                        print_help()
+                    
+                    elif cmd in ("clear", "cls"):
+                        os.system("clear" if os.name != "nt" else "cls")
+                        print_banner()
+                    
+                    elif cmd in ("status", "health"):
+                        await self.print_status()
+                    
+                    elif cmd == "url":
+                        if args:
+                            self.server_url = args[0]
+                            print(f"{C.GREEN}Server URL changed to: {self.server_url}{C.RESET}")
+                        else:
+                            print(f"Server URL: {C.CYAN}{self.server_url}{C.RESET}")
+                    
+                    elif cmd in ("new", "acquire"):
+                        print(f"{C.DIM}Acquiring session...{C.RESET}")
+                        sid = await self.acquire_session()
+                        if sid:
+                            print(f"{C.GREEN}✓ Session acquired: {C.CYAN}{sid}{C.RESET}")
+                        else:
+                            print(f"{C.RED}✗ Failed to acquire session{C.RESET}")
+                    
+                    elif cmd in ("release", "done"):
+                        if self.session_id:
+                            sid = self.session_id
+                            await self.release_session()
+                            print(f"{C.GREEN}✓ Session released: {C.CYAN}{sid}{C.RESET}")
+                        else:
+                            print(f"{C.YELLOW}No active session{C.RESET}")
+                    
+                    elif cmd == "sessions":
+                        if self.sessions:
+                            print(f"\n{C.BOLD}Your sessions:{C.RESET}")
+                            for sid in self.sessions:
+                                marker = f"{C.GREEN}→{C.RESET}" if sid == self.session_id else " "
+                                print(f"  {marker} {C.CYAN}{sid}{C.RESET}")
+                            print()
+                        else:
+                            print(f"{C.DIM}No sessions. Use 'new' to acquire one.{C.RESET}")
+                    
+                    elif line.startswith("!"):
+                        # Execute locally
+                        os.system(line[1:])
+                    
+                    else:
+                        # Execute in sandbox
+                        if not self.session_id:
+                            print(f"{C.YELLOW}No active session. Use 'new' to acquire one.{C.RESET}")
+                            continue
+                        
+                        result = await self.execute(line)
+                        
+                        if "error" in result:
+                            print(f"{C.RED}{result['error']}{C.RESET}")
+                        else:
+                            # Print stdout
+                            if result.get("stdout"):
+                                print(result["stdout"], end="")
+                            
+                            # Print stderr in red
+                            if result.get("stderr"):
+                                print(f"{C.RED}{result['stderr']}{C.RESET}", end="")
+                            
+                            # Show return code if non-zero
+                            if result.get("return_code", 0) != 0:
+                                print(f"{C.DIM}[exit: {result['return_code']}]{C.RESET}")
+                
+                except KeyboardInterrupt:
+                    print(f"\n{C.DIM}(Use 'exit' to quit){C.RESET}")
+                    continue
+                except EOFError:
+                    print()
+                    break
+        
+        finally:
+            await self.close()
+
+
+# =============================================================================
+# Main
+# =============================================================================
+
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Bash Sandbox Interactive CLI")
+    parser.add_argument(
+        "--server", "-s",
+        default=os.getenv("SANDBOX_SERVER", "http://localhost:8180"),
+        help="Server URL (default: http://localhost:8180)"
+    )
+    args = parser.parse_args()
+    
+    cli = SandboxCLI(server_url=args.server)
+    asyncio.run(cli.run())
+
+
+if __name__ == "__main__":
+    main()

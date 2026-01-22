@@ -62,6 +62,17 @@ from swerex.runtime.abstract import BashAction, CreateBashSessionRequest, CloseS
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Debug logging helper - properly closes file after writing
+import json as _json
+_DEBUG_LOG_PATH = "/tmp/swerex_debug.log"
+def _debug_log(data: dict):
+    """Write debug log entry and properly close the file."""
+    try:
+        with open(_DEBUG_LOG_PATH, "a") as f:
+            f.write(_json.dumps(data) + "\n")
+    except Exception:
+        pass  # Don't let logging failures break the server
+
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -405,7 +416,7 @@ class SessionManager:
             HTTPException: If no session available within timeout
         """
         # #region agent log
-        import json as _json; _acq_start = time.time(); _log_path = "/tmp/swerex_debug.log"; open(_log_path, "a").write(_json.dumps({"hypothesisId": "A_server", "location": "swerex_server.py:acquire:start", "message": "acquire_start", "data": {"num_files": len(files) if files else 0, "available_sessions": sum(1 for s in self.sessions.values() if s.state == SessionState.AVAILABLE), "in_use_sessions": sum(1 for s in self.sessions.values() if s.state == SessionState.IN_USE)}, "timestamp": int(time.time()*1000)}) + "\n")
+        _acq_start = time.time(); _debug_log({"hypothesisId": "A_server", "location": "swerex_server.py:acquire:start", "message": "acquire_start", "data": {"num_files": len(files) if files else 0, "available_sessions": sum(1 for s in self.sessions.values() if s.state == SessionState.AVAILABLE), "in_use_sessions": sum(1 for s in self.sessions.values() if s.state == SessionState.IN_USE)}, "timestamp": int(time.time()*1000)})
         # #endregion
         if timeout is None:
             timeout = self._acquire_timeout
@@ -414,11 +425,11 @@ class SessionManager:
         deadline = time.time() + timeout
         
         # #region agent log
-        _lock_start = time.time(); open(_log_path, "a").write(_json.dumps({"hypothesisId": "A_server", "location": "swerex_server.py:acquire:lock_wait", "message": "waiting_for_lock", "data": {"time_before_lock_ms": int((_lock_start - _acq_start)*1000)}, "timestamp": int(time.time()*1000)}) + "\n")
+        _lock_start = time.time(); _debug_log({"hypothesisId": "A_server", "location": "swerex_server.py:acquire:lock_wait", "message": "waiting_for_lock", "data": {"time_before_lock_ms": int((_lock_start - _acq_start)*1000)}, "timestamp": int(time.time()*1000)})
         # #endregion
         async with self._session_available:
             # #region agent log
-            _lock_acquired = time.time(); open(_log_path, "a").write(_json.dumps({"hypothesisId": "A_server", "location": "swerex_server.py:acquire:lock_acquired", "message": "lock_acquired", "data": {"lock_wait_ms": int((_lock_acquired - _lock_start)*1000)}, "timestamp": int(time.time()*1000)}) + "\n")
+            _lock_acquired = time.time(); _debug_log({"hypothesisId": "A_server", "location": "swerex_server.py:acquire:lock_acquired", "message": "lock_acquired", "data": {"lock_wait_ms": int((_lock_acquired - _lock_start)*1000)}, "timestamp": int(time.time()*1000)})
             # #endregion
             while session is None:
                 # Try to find an available session
@@ -446,7 +457,7 @@ class SessionManager:
                 remaining = deadline - time.time()
                 if remaining <= 0:
                     # #region agent log
-                    open(_log_path, "a").write(_json.dumps({"hypothesisId": "C_server", "location": "swerex_server.py:acquire:timeout", "message": "acquire_timeout_no_session", "data": {"timeout": timeout, "total_wait_ms": int((time.time() - _acq_start)*1000)}, "timestamp": int(time.time()*1000)}) + "\n")
+                    _debug_log({"hypothesisId": "C_server", "location": "swerex_server.py:acquire:timeout", "message": "acquire_timeout_no_session", "data": {"timeout": timeout, "total_wait_ms": int((time.time() - _acq_start)*1000)}, "timestamp": int(time.time()*1000)})
                     # #endregion
                     raise HTTPException(
                         status_code=503,
@@ -465,7 +476,7 @@ class SessionManager:
                     pass
         
         # #region agent log
-        _setup_start = time.time(); open(_log_path, "a").write(_json.dumps({"hypothesisId": "D_server", "location": "swerex_server.py:acquire:setup_start", "message": "starting_setup", "data": {"session_id": session.id, "has_files": bool(files), "has_commands": bool(startup_commands)}, "timestamp": int(time.time()*1000)}) + "\n")
+        _setup_start = time.time(); _debug_log({"hypothesisId": "D_server", "location": "swerex_server.py:acquire:setup_start", "message": "starting_setup", "data": {"session_id": session.id, "has_files": bool(files), "has_commands": bool(startup_commands)}, "timestamp": int(time.time()*1000)})
         # #endregion
         # Setup files/commands outside lock (can take time)
         # Use semaphore to limit concurrent setups to avoid overwhelming containers
@@ -479,12 +490,12 @@ class SessionManager:
                 session.state = SessionState.BROKEN
             await self._cleanup_queue.put(session.id)
             # #region agent log
-            open(_log_path, "a").write(_json.dumps({"hypothesisId": "D_server", "location": "swerex_server.py:acquire:setup_failed", "message": "setup_failed", "data": {"error": str(e)[:200], "setup_duration_ms": int((time.time() - _setup_start)*1000)}, "timestamp": int(time.time()*1000)}) + "\n")
+            _debug_log({"hypothesisId": "D_server", "location": "swerex_server.py:acquire:setup_failed", "message": "setup_failed", "data": {"error": str(e)[:200], "setup_duration_ms": int((time.time() - _setup_start)*1000)}, "timestamp": int(time.time()*1000)})
             # #endregion
             raise HTTPException(status_code=500, detail=f"Session setup failed: {e}")
         
         # #region agent log
-        open(_log_path, "a").write(_json.dumps({"hypothesisId": "A_server", "location": "swerex_server.py:acquire:success", "message": "acquire_complete", "data": {"session_id": session.id, "total_duration_ms": int((time.time() - _acq_start)*1000), "setup_duration_ms": int((time.time() - _setup_start)*1000)}, "timestamp": int(time.time()*1000)}) + "\n")
+        _debug_log({"hypothesisId": "A_server", "location": "swerex_server.py:acquire:success", "message": "acquire_complete", "data": {"session_id": session.id, "total_duration_ms": int((time.time() - _acq_start)*1000), "setup_duration_ms": int((time.time() - _setup_start)*1000)}, "timestamp": int(time.time()*1000)})
         # #endregion
         logger.debug(f"Acquired session {session.id}")
         return session.id
@@ -925,19 +936,19 @@ async def acquire_session(request: AcquireRequest) -> AcquireResponse:
     assert _acquire_semaphore is not None
     
     # #region agent log
-    import json as _json; _endpoint_start = time.time(); _log_path = "/tmp/swerex_debug.log"; open(_log_path, "a").write(_json.dumps({"hypothesisId": "E_ratelimit", "location": "swerex_server.py:acquire_endpoint:start", "message": "endpoint_received_request", "data": {"num_files": len(request.files) if request.files else 0}, "timestamp": int(time.time()*1000)}) + "\n")
+    _endpoint_start = time.time(); _debug_log({"hypothesisId": "E_ratelimit", "location": "swerex_server.py:acquire_endpoint:start", "message": "endpoint_received_request", "data": {"num_files": len(request.files) if request.files else 0}, "timestamp": int(time.time()*1000)})
     # #endregion
     
     # Rate limit: only process N acquire requests concurrently
     async with _acquire_semaphore:
         # #region agent log
-        _after_semaphore = time.time(); open(_log_path, "a").write(_json.dumps({"hypothesisId": "E_ratelimit", "location": "swerex_server.py:acquire_endpoint:semaphore_acquired", "message": "semaphore_acquired", "data": {"semaphore_wait_ms": int((_after_semaphore - _endpoint_start)*1000)}, "timestamp": int(time.time()*1000)}) + "\n")
+        _after_semaphore = time.time(); _debug_log({"hypothesisId": "E_ratelimit", "location": "swerex_server.py:acquire_endpoint:semaphore_acquired", "message": "semaphore_acquired", "data": {"semaphore_wait_ms": int((_after_semaphore - _endpoint_start)*1000)}, "timestamp": int(time.time()*1000)})
         # #endregion
         
         session_id = await manager.acquire(request.files, request.startup_commands)
         
         # #region agent log
-        open(_log_path, "a").write(_json.dumps({"hypothesisId": "E_ratelimit", "location": "swerex_server.py:acquire_endpoint:complete", "message": "endpoint_complete", "data": {"session_id": session_id, "total_endpoint_ms": int((time.time() - _endpoint_start)*1000)}, "timestamp": int(time.time()*1000)}) + "\n")
+        _debug_log({"hypothesisId": "E_ratelimit", "location": "swerex_server.py:acquire_endpoint:complete", "message": "endpoint_complete", "data": {"session_id": session_id, "total_endpoint_ms": int((time.time() - _endpoint_start)*1000)}, "timestamp": int(time.time()*1000)})
         # #endregion
         
         return AcquireResponse(session_id=session_id)

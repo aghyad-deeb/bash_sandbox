@@ -38,7 +38,7 @@ A scalable, stateful bash execution server for AI agents. Provides persistent ba
 ### 1. Build the sandbox container image
 
 ```bash
-docker build -t swerex-sandbox:latest -f docker/Dockerfile.sandbox .
+docker build -t swerex-sandbox:latest -f Dockerfile.sandbox .
 ```
 
 ### 2. Start containers and server
@@ -184,7 +184,7 @@ python tests/stress_test_client.py --workers 1000 --commands 5
 ### Generate Docker Compose for N containers
 
 ```bash
-python docker/generate_compose.py --containers 128
+python generate_compose.py --containers 128
 ```
 
 ## License

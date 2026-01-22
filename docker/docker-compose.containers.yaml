@@ -1,0 +1,800 @@
+# Auto-generated docker-compose.yaml
+# Generated with: python generate_compose.py --containers 128
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f session-server
+#   curl http://localhost:8080/health
+
+version: "3.8"
+
+services:
+  # Base swerex sandbox configuration
+  swerex-base:
+    image: swerex-sandbox:latest
+    read_only: true
+    tmpfs:
+      - /tmp:size=500M,mode=1777
+      - /root:size=100M
+    environment:
+      - AUTH_TOKEN=${SWEREX_AUTH_TOKEN:-default-token}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  swerex-0:
+    extends:
+      service: swerex-base
+    ports:
+      - "18000:8000"
+
+  swerex-1:
+    extends:
+      service: swerex-base
+    ports:
+      - "18001:8000"
+
+  swerex-2:
+    extends:
+      service: swerex-base
+    ports:
+      - "18002:8000"
+
+  swerex-3:
+    extends:
+      service: swerex-base
+    ports:
+      - "18003:8000"
+
+  swerex-4:
+    extends:
+      service: swerex-base
+    ports:
+      - "18004:8000"
+
+  swerex-5:
+    extends:
+      service: swerex-base
+    ports:
+      - "18005:8000"
+
+  swerex-6:
+    extends:
+      service: swerex-base
+    ports:
+      - "18006:8000"
+
+  swerex-7:
+    extends:
+      service: swerex-base
+    ports:
+      - "18007:8000"
+
+  swerex-8:
+    extends:
+      service: swerex-base
+    ports:
+      - "18008:8000"
+
+  swerex-9:
+    extends:
+      service: swerex-base
+    ports:
+      - "18009:8000"
+
+  swerex-10:
+    extends:
+      service: swerex-base
+    ports:
+      - "18010:8000"
+
+  swerex-11:
+    extends:
+      service: swerex-base
+    ports:
+      - "18011:8000"
+
+  swerex-12:
+    extends:
+      service: swerex-base
+    ports:
+      - "18012:8000"
+
+  swerex-13:
+    extends:
+      service: swerex-base
+    ports:
+      - "18013:8000"
+
+  swerex-14:
+    extends:
+      service: swerex-base
+    ports:
+      - "18014:8000"
+
+  swerex-15:
+    extends:
+      service: swerex-base
+    ports:
+      - "18015:8000"
+
+  swerex-16:
+    extends:
+      service: swerex-base
+    ports:
+      - "18016:8000"
+
+  swerex-17:
+    extends:
+      service: swerex-base
+    ports:
+      - "18017:8000"
+
+  swerex-18:
+    extends:
+      service: swerex-base
+    ports:
+      - "18018:8000"
+
+  swerex-19:
+    extends:
+      service: swerex-base
+    ports:
+      - "18019:8000"
+
+  swerex-20:
+    extends:
+      service: swerex-base
+    ports:
+      - "18020:8000"
+
+  swerex-21:
+    extends:
+      service: swerex-base
+    ports:
+      - "18021:8000"
+
+  swerex-22:
+    extends:
+      service: swerex-base
+    ports:
+      - "18022:8000"
+
+  swerex-23:
+    extends:
+      service: swerex-base
+    ports:
+      - "18023:8000"
+
+  swerex-24:
+    extends:
+      service: swerex-base
+    ports:
+      - "18024:8000"
+
+  swerex-25:
+    extends:
+      service: swerex-base
+    ports:
+      - "18025:8000"
+
+  swerex-26:
+    extends:
+      service: swerex-base
+    ports:
+      - "18026:8000"
+
+  swerex-27:
+    extends:
+      service: swerex-base
+    ports:
+      - "18027:8000"
+
+  swerex-28:
+    extends:
+      service: swerex-base
+    ports:
+      - "18028:8000"
+
+  swerex-29:
+    extends:
+      service: swerex-base
+    ports:
+      - "18029:8000"
+
+  swerex-30:
+    extends:
+      service: swerex-base
+    ports:
+      - "18030:8000"
+
+  swerex-31:
+    extends:
+      service: swerex-base
+    ports:
+      - "18031:8000"
+
+  swerex-32:
+    extends:
+      service: swerex-base
+    ports:
+      - "18032:8000"
+
+  swerex-33:
+    extends:
+      service: swerex-base
+    ports:
+      - "18033:8000"
+
+  swerex-34:
+    extends:
+      service: swerex-base
+    ports:
+      - "18034:8000"
+
+  swerex-35:
+    extends:
+      service: swerex-base
+    ports:
+      - "18035:8000"
+
+  swerex-36:
+    extends:
+      service: swerex-base
+    ports:
+      - "18036:8000"
+
+  swerex-37:
+    extends:
+      service: swerex-base
+    ports:
+      - "18037:8000"
+
+  swerex-38:
+    extends:
+      service: swerex-base
+    ports:
+      - "18038:8000"
+
+  swerex-39:
+    extends:
+      service: swerex-base
+    ports:
+      - "18039:8000"
+
+  swerex-40:
+    extends:
+      service: swerex-base
+    ports:
+      - "18040:8000"
+
+  swerex-41:
+    extends:
+      service: swerex-base
+    ports:
+      - "18041:8000"
+
+  swerex-42:
+    extends:
+      service: swerex-base
+    ports:
+      - "18042:8000"
+
+  swerex-43:
+    extends:
+      service: swerex-base
+    ports:
+      - "18043:8000"
+
+  swerex-44:
+    extends:
+      service: swerex-base
+    ports:
+      - "18044:8000"
+
+  swerex-45:
+    extends:
+      service: swerex-base
+    ports:
+      - "18045:8000"
+
+  swerex-46:
+    extends:
+      service: swerex-base
+    ports:
+      - "18046:8000"
+
+  swerex-47:
+    extends:
+      service: swerex-base
+    ports:
+      - "18047:8000"
+
+  swerex-48:
+    extends:
+      service: swerex-base
+    ports:
+      - "18048:8000"
+
+  swerex-49:
+    extends:
+      service: swerex-base
+    ports:
+      - "18049:8000"
+
+  swerex-50:
+    extends:
+      service: swerex-base
+    ports:
+      - "18050:8000"
+
+  swerex-51:
+    extends:
+      service: swerex-base
+    ports:
+      - "18051:8000"
+
+  swerex-52:
+    extends:
+      service: swerex-base
+    ports:
+      - "18052:8000"
+
+  swerex-53:
+    extends:
+      service: swerex-base
+    ports:
+      - "18053:8000"
+
+  swerex-54:
+    extends:
+      service: swerex-base
+    ports:
+      - "18054:8000"
+
+  swerex-55:
+    extends:
+      service: swerex-base
+    ports:
+      - "18055:8000"
+
+  swerex-56:
+    extends:
+      service: swerex-base
+    ports:
+      - "18056:8000"
+
+  swerex-57:
+    extends:
+      service: swerex-base
+    ports:
+      - "18057:8000"
+
+  swerex-58:
+    extends:
+      service: swerex-base
+    ports:
+      - "18058:8000"
+
+  swerex-59:
+    extends:
+      service: swerex-base
+    ports:
+      - "18059:8000"
+
+  swerex-60:
+    extends:
+      service: swerex-base
+    ports:
+      - "18060:8000"
+
+  swerex-61:
+    extends:
+      service: swerex-base
+    ports:
+      - "18061:8000"
+
+  swerex-62:
+    extends:
+      service: swerex-base
+    ports:
+      - "18062:8000"
+
+  swerex-63:
+    extends:
+      service: swerex-base
+    ports:
+      - "18063:8000"
+
+  swerex-64:
+    extends:
+      service: swerex-base
+    ports:
+      - "18064:8000"
+
+  swerex-65:
+    extends:
+      service: swerex-base
+    ports:
+      - "18065:8000"
+
+  swerex-66:
+    extends:
+      service: swerex-base
+    ports:
+      - "18066:8000"
+
+  swerex-67:
+    extends:
+      service: swerex-base
+    ports:
+      - "18067:8000"
+
+  swerex-68:
+    extends:
+      service: swerex-base
+    ports:
+      - "18068:8000"
+
+  swerex-69:
+    extends:
+      service: swerex-base
+    ports:
+      - "18069:8000"
+
+  swerex-70:
+    extends:
+      service: swerex-base
+    ports:
+      - "18070:8000"
+
+  swerex-71:
+    extends:
+      service: swerex-base
+    ports:
+      - "18071:8000"
+
+  swerex-72:
+    extends:
+      service: swerex-base
+    ports:
+      - "18072:8000"
+
+  swerex-73:
+    extends:
+      service: swerex-base
+    ports:
+      - "18073:8000"
+
+  swerex-74:
+    extends:
+      service: swerex-base
+    ports:
+      - "18074:8000"
+
+  swerex-75:
+    extends:
+      service: swerex-base
+    ports:
+      - "18075:8000"
+
+  swerex-76:
+    extends:
+      service: swerex-base
+    ports:
+      - "18076:8000"
+
+  swerex-77:
+    extends:
+      service: swerex-base
+    ports:
+      - "18077:8000"
+
+  swerex-78:
+    extends:
+      service: swerex-base
+    ports:
+      - "18078:8000"
+
+  swerex-79:
+    extends:
+      service: swerex-base
+    ports:
+      - "18079:8000"
+
+  swerex-80:
+    extends:
+      service: swerex-base
+    ports:
+      - "18080:8000"
+
+  swerex-81:
+    extends:
+      service: swerex-base
+    ports:
+      - "18081:8000"
+
+  swerex-82:
+    extends:
+      service: swerex-base
+    ports:
+      - "18082:8000"
+
+  swerex-83:
+    extends:
+      service: swerex-base
+    ports:
+      - "18083:8000"
+
+  swerex-84:
+    extends:
+      service: swerex-base
+    ports:
+      - "18084:8000"
+
+  swerex-85:
+    extends:
+      service: swerex-base
+    ports:
+      - "18085:8000"
+
+  swerex-86:
+    extends:
+      service: swerex-base
+    ports:
+      - "18086:8000"
+
+  swerex-87:
+    extends:
+      service: swerex-base
+    ports:
+      - "18087:8000"
+
+  swerex-88:
+    extends:
+      service: swerex-base
+    ports:
+      - "18088:8000"
+
+  swerex-89:
+    extends:
+      service: swerex-base
+    ports:
+      - "18089:8000"
+
+  swerex-90:
+    extends:
+      service: swerex-base
+    ports:
+      - "18090:8000"
+
+  swerex-91:
+    extends:
+      service: swerex-base
+    ports:
+      - "18091:8000"
+
+  swerex-92:
+    extends:
+      service: swerex-base
+    ports:
+      - "18092:8000"
+
+  swerex-93:
+    extends:
+      service: swerex-base
+    ports:
+      - "18093:8000"
+
+  swerex-94:
+    extends:
+      service: swerex-base
+    ports:
+      - "18094:8000"
+
+  swerex-95:
+    extends:
+      service: swerex-base
+    ports:
+      - "18095:8000"
+
+  swerex-96:
+    extends:
+      service: swerex-base
+    ports:
+      - "18096:8000"
+
+  swerex-97:
+    extends:
+      service: swerex-base
+    ports:
+      - "18097:8000"
+
+  swerex-98:
+    extends:
+      service: swerex-base
+    ports:
+      - "18098:8000"
+
+  swerex-99:
+    extends:
+      service: swerex-base
+    ports:
+      - "18099:8000"
+
+  swerex-100:
+    extends:
+      service: swerex-base
+    ports:
+      - "18100:8000"
+
+  swerex-101:
+    extends:
+      service: swerex-base
+    ports:
+      - "18101:8000"
+
+  swerex-102:
+    extends:
+      service: swerex-base
+    ports:
+      - "18102:8000"
+
+  swerex-103:
+    extends:
+      service: swerex-base
+    ports:
+      - "18103:8000"
+
+  swerex-104:
+    extends:
+      service: swerex-base
+    ports:
+      - "18104:8000"
+
+  swerex-105:
+    extends:
+      service: swerex-base
+    ports:
+      - "18105:8000"
+
+  swerex-106:
+    extends:
+      service: swerex-base
+    ports:
+      - "18106:8000"
+
+  swerex-107:
+    extends:
+      service: swerex-base
+    ports:
+      - "18107:8000"
+
+  swerex-108:
+    extends:
+      service: swerex-base
+    ports:
+      - "18108:8000"
+
+  swerex-109:
+    extends:
+      service: swerex-base
+    ports:
+      - "18109:8000"
+
+  swerex-110:
+    extends:
+      service: swerex-base
+    ports:
+      - "18110:8000"
+
+  swerex-111:
+    extends:
+      service: swerex-base
+    ports:
+      - "18111:8000"
+
+  swerex-112:
+    extends:
+      service: swerex-base
+    ports:
+      - "18112:8000"
+
+  swerex-113:
+    extends:
+      service: swerex-base
+    ports:
+      - "18113:8000"
+
+  swerex-114:
+    extends:
+      service: swerex-base
+    ports:
+      - "18114:8000"
+
+  swerex-115:
+    extends:
+      service: swerex-base
+    ports:
+      - "18115:8000"
+
+  swerex-116:
+    extends:
+      service: swerex-base
+    ports:
+      - "18116:8000"
+
+  swerex-117:
+    extends:
+      service: swerex-base
+    ports:
+      - "18117:8000"
+
+  swerex-118:
+    extends:
+      service: swerex-base
+    ports:
+      - "18118:8000"
+
+  swerex-119:
+    extends:
+      service: swerex-base
+    ports:
+      - "18119:8000"
+
+  swerex-120:
+    extends:
+      service: swerex-base
+    ports:
+      - "18120:8000"
+
+  swerex-121:
+    extends:
+      service: swerex-base
+    ports:
+      - "18121:8000"
+
+  swerex-122:
+    extends:
+      service: swerex-base
+    ports:
+      - "18122:8000"
+
+  swerex-123:
+    extends:
+      service: swerex-base
+    ports:
+      - "18123:8000"
+
+  swerex-124:
+    extends:
+      service: swerex-base
+    ports:
+      - "18124:8000"
+
+  swerex-125:
+    extends:
+      service: swerex-base
+    ports:
+      - "18125:8000"
+
+  swerex-126:
+    extends:
+      service: swerex-base
+    ports:
+      - "18126:8000"
+
+  swerex-127:
+    extends:
+      service: swerex-base
+    ports:
+      - "18127:8000"

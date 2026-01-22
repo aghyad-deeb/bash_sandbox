@@ -209,6 +209,10 @@ class SessionManager:
         # Configuration
         self._acquire_timeout = float(os.getenv("SWEREX_ACQUIRE_TIMEOUT", "120"))  # Max wait time for session
         self._cleanup_workers = int(os.getenv("SWEREX_CLEANUP_WORKERS", "32"))  # Parallel cleanup workers
+        self._max_concurrent_setup = int(os.getenv("SWEREX_MAX_CONCURRENT_SETUP", "32"))  # Limit concurrent session setups
+        
+        # Semaphore to limit concurrent session setup operations
+        self._setup_semaphore = asyncio.Semaphore(self._max_concurrent_setup)
         
         # Background tasks
         self._background_tasks: list[asyncio.Task] = []
@@ -461,9 +465,11 @@ class SessionManager:
         _setup_start = time.time(); open(_log_path, "a").write(_json.dumps({"hypothesisId": "D_server", "location": "swerex_server.py:acquire:setup_start", "message": "starting_setup", "data": {"session_id": session.id, "has_files": bool(files), "has_commands": bool(startup_commands)}, "timestamp": int(time.time()*1000)}) + "\n")
         # #endregion
         # Setup files/commands outside lock (can take time)
+        # Use semaphore to limit concurrent setups to avoid overwhelming containers
         try:
             if files or startup_commands:
-                await self._setup_session(session, files, startup_commands)
+                async with self._setup_semaphore:
+                    await self._setup_session(session, files, startup_commands)
         except Exception as e:
             # Release session on setup failure
             async with self._lock:

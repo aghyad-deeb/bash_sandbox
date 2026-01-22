@@ -110,7 +110,7 @@ def generate_compose(
     lines.extend([
         "  # Base swerex sandbox configuration",
         "  swerex-base:",
-        "    image: swerex-sandbox:latest",
+        "    image: aptl26/swerex-sandbox:latest",
         "    read_only: true",
         "    tmpfs:",
         "      - /tmp:size=500M,mode=1777",

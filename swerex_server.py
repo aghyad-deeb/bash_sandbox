@@ -116,6 +116,7 @@ class CommandResult:
     stdout: str
     stderr: str
     return_code: int
+    files: Optional[dict[str, str]] = None  # filename -> base64 content
 
 
 # =============================================================================
@@ -138,6 +139,7 @@ class ExecuteRequest(BaseModel):
     """Request to execute a command."""
     command: str
     timeout: float = 30.0
+    fetch_files: Optional[list[str]] = None  # List of file paths to fetch after execution
 
 
 class ExecuteResponse(BaseModel):
@@ -146,6 +148,7 @@ class ExecuteResponse(BaseModel):
     stdout: str
     stderr: str
     return_code: int
+    files: Optional[dict[str, str]] = None  # filename -> base64 content
 
 
 class HealthResponse(BaseModel):
@@ -503,6 +506,7 @@ class SessionManager:
         session_id: str,
         command: str,
         timeout: float = SWEREX_COMMAND_TIMEOUT,
+        fetch_files: Optional[list[str]] = None,
     ) -> CommandResult:
         """
         Execute a command in a session.
@@ -511,9 +515,10 @@ class SessionManager:
             session_id: Session ID from acquire()
             command: Bash command to execute
             timeout: Command timeout in seconds
+            fetch_files: Optional list of file paths to fetch after execution
             
         Returns:
-            CommandResult with status, stdout, stderr, return_code
+            CommandResult with status, stdout, stderr, return_code, and optionally files
         """
         session = self.sessions.get(session_id)
         if not session:
@@ -529,6 +534,8 @@ class SessionManager:
         if not container or not container.deployment:
             raise HTTPException(status_code=500, detail="Container not available")
         
+        files_result: Optional[dict[str, str]] = None
+        
         try:
             runtime = container.deployment.runtime
             
@@ -540,11 +547,19 @@ class SessionManager:
             )
             
             status = "Success" if result.exit_code == 0 else "Failed"
+            
+            # Fetch files if requested
+            if fetch_files:
+                files_result = await self._fetch_files(
+                    runtime, session.bash_session_name, fetch_files, timeout
+                )
+            
             return CommandResult(
                 status=status,
                 stdout=result.output,
                 stderr="",
                 return_code=result.exit_code,
+                files=files_result,
             )
             
         except asyncio.TimeoutError:
@@ -553,6 +568,7 @@ class SessionManager:
                 stdout="",
                 stderr=f"Command timed out after {timeout} seconds",
                 return_code=-1,
+                files=None,
             )
         except Exception as e:
             # Check for non-zero exit code errors
@@ -572,7 +588,51 @@ class SessionManager:
                 stdout=output,
                 stderr=str(e) if not output else "",
                 return_code=exit_code,
+                files=None,
             )
+    
+    async def _fetch_files(
+        self,
+        runtime,
+        bash_session_name: str,
+        file_paths: list[str],
+        timeout: float,
+    ) -> dict[str, str]:
+        """
+        Fetch files from the session and return as base64-encoded content.
+        
+        Args:
+            runtime: The container runtime
+            bash_session_name: Name of the bash session
+            file_paths: List of file paths to fetch
+            timeout: Timeout for file operations
+            
+        Returns:
+            Dict of filename -> base64-encoded content
+        """
+        files = {}
+        for path in file_paths:
+            try:
+                # Use base64 to encode file content
+                result = await asyncio.wait_for(
+                    runtime.run_in_session(
+                        BashAction(
+                            session=bash_session_name,
+                            command=f"base64 -w 0 '{path}' 2>/dev/null || echo 'FILE_NOT_FOUND'"
+                        )
+                    ),
+                    timeout=timeout
+                )
+                
+                output = result.output.strip()
+                if output and output != "FILE_NOT_FOUND" and result.exit_code == 0:
+                    files[path] = output
+                else:
+                    logger.debug(f"File not found or empty: {path}")
+            except Exception as e:
+                logger.warning(f"Failed to fetch file {path}: {e}")
+        
+        return files
     
     async def release(self, session_id: str) -> None:
         """
@@ -829,12 +889,18 @@ async def acquire_session(request: AcquireRequest) -> AcquireResponse:
 async def execute_command(session_id: str, request: ExecuteRequest) -> ExecuteResponse:
     """Execute a command in an acquired session."""
     assert manager is not None
-    result = await manager.execute(session_id, request.command, request.timeout)
+    result = await manager.execute(
+        session_id, 
+        request.command, 
+        request.timeout,
+        fetch_files=request.fetch_files,
+    )
     return ExecuteResponse(
         status=result.status,
         stdout=result.stdout,
         stderr=result.stderr,
         return_code=result.return_code,
+        files=result.files,
     )
 
 

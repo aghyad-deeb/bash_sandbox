@@ -29,8 +29,8 @@ if [ "$KEEP_CONTAINERS" = false ]; then
     echo "Stopping containers..."
     
     # Try docker-compose first
-    if [ -f "docker-compose.containers.yaml" ]; then
-        docker compose -f docker-compose.containers.yaml down 2>/dev/null && echo "  Containers stopped" || true
+    if [ -f "docker-compose.yaml" ]; then
+        docker compose -f docker-compose.yaml down 2>/dev/null && echo "  Containers stopped" || true
     fi
     
     # Also stop any stray containers

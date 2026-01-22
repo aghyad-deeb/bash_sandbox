@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 NUM_CONTAINERS="${1:-128}"
-COMPOSE_FILE="docker-compose.containers.yaml"
+COMPOSE_FILE="docker-compose.yaml"
 
 echo "=== Starting SweRex Containers ==="
 echo "Containers: $NUM_CONTAINERS"

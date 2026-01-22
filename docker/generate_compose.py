@@ -36,7 +36,7 @@ def generate_compose(
     sessions_per_container: int = 8,
     with_ports: bool = False,
     base_port: int = 18000,
-    include_server: bool = True,
+    include_server: bool = False,
     output_path: str = "docker-compose.yaml",
 ) -> str:
     """
@@ -250,7 +250,7 @@ def main():
         help="Starting port number when --with-ports is used (default: 18000)"
     )
     parser.add_argument(
-        "--no-server",
+        "--with-server",
         action="store_true",
         help="Don't include session-server service (containers only)"
     )
@@ -280,7 +280,7 @@ def main():
             sessions_per_container=args.sessions_per_container,
             with_ports=args.with_ports,
             base_port=args.base_port,
-            include_server=not args.no_server,
+            include_server=args.with_server,
             output_path=args.output,
         )
     
